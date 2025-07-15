@@ -103,6 +103,7 @@ def load_dataset(name, cfg_path=None, vis_path=None, data_type=None):
     >>> print([len(dataset[split]) for split in splits])
 
     """
+
     if cfg_path is None:
         cfg = None
     else:
@@ -117,6 +118,8 @@ def load_dataset(name, cfg_path=None, vis_path=None, data_type=None):
             + ", ".join([str(k) for k in dataset_zoo.get_names()])
         )
         exit(1)
+
+    print(f"oi, o builder é {builder} e a config é {builder.config.build_info}")
 
     if vis_path is not None:
         if data_type is None:

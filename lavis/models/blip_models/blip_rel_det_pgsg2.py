@@ -90,6 +90,7 @@ class BlipRelDetectionPGSG(BlipRelDetection):
                                                        mask_label_ratio=mask_label_ratio, aux_close_classifier=aux_close_classifier,
                                                        cate_dict_url=cate_dict_url, box_loss_weight=box_loss_weight, dump_dir=dump_dir)
 
+        # self.skip_category_conversion = cfg.get("skip_category_conversion", False)
         self.logit_wrappers = LogitsWarper(top_k=60, min_tokens_to_keep=1, top_p=1.0)
         self.seg_len = seg_len
         if post_proc_cfg is not None:
@@ -535,7 +536,6 @@ class BlipRelDetectionPGSG(BlipRelDetection):
         'the singapore harbor in twilight, as the weather is going down',
         'the famous singapore fountain at sunset']
         """
-
         # prepare inputs for decoder generation.
 
         encoder_out = self.forward_encoder(samples)
@@ -631,7 +631,24 @@ class BlipRelDetectionPGSG(BlipRelDetection):
 
         batch_object_list = self.seq2instance(decoder_out, raw_caption, verbose=False)
 
-        batch_object_list_cate_trans = self.vocab2category(batch_object_list)
+        # skip category conversion module
+        skip_category_conversion = True
+        if skip_category_conversion:
+            batch_size = samples["image"].size(0)
+            batch_object_list_cate_trans = batch_object_list        # mantém rótulos livres
+            predictions, ground_truths, image_info = [], [], None   # ← NÃO chama _postprocess
+
+            dummy_pred = {"image_id": 0, "relations": [], "entities": []}
+            if len(predictions) == 0:
+                predictions   = [dummy_pred.copy()   for _ in range(batch_size)]
+                ground_truths = [dummy_pred.copy()   for _ in range(batch_size)]
+                image_info    = [dict(image_id=0)    for _ in range(batch_size)]
+
+        # else:
+        #     batch_object_list_cate_trans = self.vocab2category(batch_object_list)
+        #     predictions, ground_truths, image_info = self._postprocess(
+        #         batch_object_list_cate_trans, samples["targets"]
+        #     )
 
         if self.text_decoder.pos_adapter_on:
             # extract entity instance and categories hs
@@ -663,27 +680,13 @@ class BlipRelDetectionPGSG(BlipRelDetection):
                         inst_id//2)][role_list[inst_id % 2]]['boxes'] = each_box_pred
 
         if self.close_classifier is not None:
+            print("AAAAAAA")
             self.aux_close_set_classifier(pred_ent_hs_all, pred_rel_hs_all, batch_object_list_cate_trans)
 
 
-        predictions = self._postprocess(batch_object_list_cate_trans, 
-                                        samples['targets'])
-        ground_truths, image_info = self._gtpostprocess(samples['targets'])
-
-        graph_list = []          # will hold one dict per image in the batch
-        for inst_list in batch_object_list_cate_trans:
-            triplets = []
-            for inst in inst_list:
-                triplets.append({
-                    "sub":       inst["sub"]["label"],
-                    "obj":       inst["obj"]["label"],
-                    "pred":      inst["predicate"]["label"],
-                    "score":     float(inst["predicate"]["pred_scores"].max()),
-                    # boxes in xywh, float32
-                    "sub_box":   inst["sub"].get("boxes", []).tolist(),
-                    "obj_box":   inst["obj"].get("boxes", []).tolist(),
-                })
-            graph_list.append(triplets)
+        # predictions = self._postprocess(batch_object_list_cate_trans, 
+        #                                 samples['targets'])
+        # ground_truths, image_info = self._gtpostprocess(samples['targets'])
 
         if self.dump_pred:
             self.dump_prediction_res(samples, image_embeds, 
@@ -692,231 +695,88 @@ class BlipRelDetectionPGSG(BlipRelDetection):
                                      encoder_attention_mask, 
                                      predictions, ground_truths)
 
-        return predictions, ground_truths, image_info, graph_list
-    
-    def dump_prediction_res(
-        self,
-        samples,
-        image_embeds,
-        decoder_out,
-        raw_caption,
-        batch_object_list_cate_trans,
-        encoder_attention_mask,
-        predictions,
-        ground_truths,
-    ):
-        # ----------------------------
-        # 1) Skip forward_decoder entirely for inference-only
-        # ----------------------------
-        no_gt = True
-        if no_gt:
-            forward_decoder_output = None
-            decoder_targets       = []
-            box_targets           = []
-        else:
-            forward_decoder_output, decoder_targets, box_targets = (
-                self.forward_decoder(samples, image_embeds, return_box_gts_batch=True)
-            )
+        return predictions, ground_truths, image_info
 
-        # ----------------------------
-        # 2) Build raw_caption_target (safe even if decoder_targets is empty)
-        # ----------------------------
-        raw_caption_target = [
-            self.tokenizer.decode(
-                decoder_targets[i].detach().cpu(),
-                decode_raw_tokens=True,
-                skip_special_tokens=True,
-            )
-            for i in range(len(decoder_targets))
-        ]
+    def dump_prediction_res(self, samples, image_embeds, decoder_out, raw_caption, batch_object_list_cate_trans, encoder_attention_mask, predictions, ground_truths):
+        forward_decoder_output, decoder_targets, box_targets = self.forward_decoder(
+                samples, image_embeds, return_box_gts_batch=True)
+        raw_caption_target = [self.tokenizer.decode(decoder_targets[i].detach().cpu(), decode_raw_tokens=True, skip_special_tokens=True)
+                                  for i in range(len(decoder_targets))]
+        f_dec_tokens = torch.argmax(
+                forward_decoder_output.logits.contiguous(), dim=-1)
+        raw_caption_fdec = [self.tokenizer.decode(f_dec_tokens[i].detach().cpu(), decode_raw_tokens=True, skip_special_tokens=True)
+                                for i in range(len(f_dec_tokens))]
 
-        # ----------------------------
-        # 3) Compute f_dec_tokens & raw_caption_fdec only when available
-        # ----------------------------
-        if forward_decoder_output is not None:
-            f_dec_tokens = torch.argmax(
-                forward_decoder_output.logits.contiguous(), dim=-1
-            )
-            raw_caption_fdec = [
-                self.tokenizer.decode(
-                    f_dec_tokens[i].detach().cpu(),
-                    decode_raw_tokens=True,
-                    skip_special_tokens=True,
-                )
-                for i in range(f_dec_tokens.size(0))
-            ]
-        else:
-            f_dec_tokens      = []
-            raw_caption_fdec  = []
-
-        # ----------------------------
-        # 4) Skip pos_adapter when no decoder output
-        # ----------------------------
         pos_ada_output = None
-        if forward_decoder_output is not None and self.text_decoder.pos_adapter_on:
+        if self.text_decoder.pos_adapter_on:
             pred_ent_hs_all = []
-            sequence_output = forward_decoder_output.hidden_states
+            # sequence_output = forward_decoder_output.hidden_states
+            
+            # pega só a última camada (ou empilhe todas, se preferir)
+            if isinstance(forward_decoder_output.hidden_states, (tuple, list)):
+                sequence_output = forward_decoder_output.hidden_states[-1]  # (B, L, D)
+            else:
+                sequence_output = forward_decoder_output.hidden_states
+
 
             for bid, box_gts in enumerate(box_targets):
                 pred_ent_hs = []
                 for bgt in box_gts:
-                    tkn_pos = bgt["tkn_pos"]
-                    # xywh
+                    tkn_pos = bgt['tkn_pos']
+                        # xywh
                     pred_ent_hs.append(
-                        sequence_output[bid, tkn_pos - 1]
-                        + sequence_output[bid, tkn_pos - 2]
-                    )
-
-                if pred_ent_hs:
-                    pred_ent_hs = torch.stack(pred_ent_hs, dim=0)
-                else:
-                    hidden_dim = self.config.hidden_size
-                    device     = next(self.text_decoder.parameters()).device
-                    pred_ent_hs = torch.empty((0, hidden_dim), device=device)
-
+                            sequence_output[bid, tkn_pos-1] + sequence_output[bid, tkn_pos-2])  # obj token + categories token
+                pred_ent_hs = torch.stack(pred_ent_hs)
                 pred_ent_hs_all.append(pred_ent_hs)
 
             pos_ada_output = self.text_decoder.pos_adapter(
-                pred_ent_hs_all,
-                samples["image"],
-                image_embeds,
-                encoder_attention_mask,
-                box_targets,
-            )
+                    pred_ent_hs_all, samples['image'], image_embeds, encoder_attention_mask, box_targets)
 
-        # ----------------------------
-        # 5) Clean up internal keys
-        # ----------------------------
         for bi, b_pred_inst in enumerate(batch_object_list_cate_trans):
             for each_inst in b_pred_inst:
-                for fld in (
-                    "dec_hs",
-                    "int_tok_hs",
-                    "pred_dist",
-                ):
-                    each_inst["obj"].pop(fld, None)
-                    each_inst["sub"].pop(fld, None)
-                    each_inst["predicate"].pop(fld, None)
+                each_inst['obj'].pop('dec_hs')
+                each_inst['sub'].pop('dec_hs')
+                each_inst['predicate'].pop('dec_hs')
+                each_inst['obj'].pop('int_tok_hs')
+                each_inst['sub'].pop('int_tok_hs')
 
-        # ----------------------------
-        # 6) Assemble the dump buffer
-        # ----------------------------
-        image_ids = samples.get("instance_id", samples.get("image_id", [""]))[0]
+                each_inst['predicate'].pop('pred_dist')
+                each_inst['obj'].pop('pred_dist')
+                each_inst['sub'].pop('pred_dist')
+
+        image_ids = samples['instance_id'][0]
         forward_buffer = {
-            "scores":               decoder_out["scores"],
-            "raw_token":            decoder_out.sequences.detach().cpu(),
-            "f_dec_tokens":         f_dec_tokens,
-            "f_dec_pos_ada_output": pos_ada_output,
-            "raw_caption_fdec":     raw_caption_fdec,
-            "raw_caption":          raw_caption,
-            "raw_caption_target":   raw_caption_target,
-            "decoder_targets":      decoder_targets,
-            "predictions":          predictions,
-            "ground_truths":        ground_truths,
-            "image_path":           samples.get("image_pth", samples.get("image_id")),
-            "batch_object_list":    batch_object_list_cate_trans,
-            "gt_instance":          samples.get("targets", samples.get("target")),
-        }
+                # 'cross_attentions': decoder_out['cross_attentions'],
+                # 'decoder_attentions': decoder_out['decoder_attentions'],
+                'scores': decoder_out['scores'],  # num_toke, bz, vocab_size
+                # 'normed_image': samples['image'],
+                'raw_token': decoder_out.sequences.detach().cpu(),
+                # "forward_decoder_output": forward_decoder_output,
+                "f_dec_tokens": f_dec_tokens,
+                "f_dec_pos_ada_output": pos_ada_output,
+                'raw_caption_fdec': raw_caption_fdec,
+                'raw_caption': raw_caption,
+                "raw_caption_target": raw_caption_target,
+                "decoder_targets": decoder_targets,
+                # "batch_target_object_list": batch_target_object_list,
+                "predictions": predictions,
+                "ground_truths": ground_truths,
+                'image_path': samples['image_pth'],
+                "batch_object_list": batch_object_list_cate_trans,
+                "gt_instance": samples['targets']
+                # 'image_pixel': data_loader.dataset.__getitem__(img_idx, raw_image=True),
+                # 'image_size': (image_size, patch_size)
+            }
 
-        # 1) turn "b/bathroom/00000001.jpg" into "b_bathroom_00000001.jpg"
-        safe_id = image_ids.replace(os.sep, "_").replace("/", "_")
-        filename = f"vl_det_dump_{safe_id}.pkl"
-        file_path = os.path.join(self.dump_dir, filename)
+        if not os.path.exists(self.dump_dir):
+            os.makedirs(self.dump_dir)
+        logger.info(f"save data {image_ids} to {self.dump_dir}")
 
-        # 2) ensure the dump_dir itself exists
-        os.makedirs(self.dump_dir, exist_ok=True)
-        logger.info(f"save data {image_ids} to {file_path}")
-
-        # 3) write the file
-        with open(file_path, "wb") as f:
+        with open(os.path.join(self.dump_dir, f'vl_det_dump_{image_ids}.pkl'), 'wb') as f:
             pickle.dump(forward_buffer, f)
 
-
-    # def dump_prediction_res(self, samples, image_embeds, decoder_out, raw_caption, batch_object_list_cate_trans, encoder_attention_mask, predictions, ground_truths):
-    #     no_gt = True
-    #     if no_gt:
-    #         forward_decoder_output= None
-    #         decoder_targets = []
-    #         box_targets = []
-    #     else:
-    #         forward_decoder_output, decoder_targets, box_targets = self.forward_decoder(
-    #             samples, image_embeds, return_box_gts_batch=True)
-    #     raw_caption_target = [self.tokenizer.decode(decoder_targets[i].detach().cpu(), decode_raw_tokens=True, skip_special_tokens=True)
-    #                               for i in range(len(decoder_targets))]
-    #     f_dec_tokens = torch.argmax(
-    #             forward_decoder_output.logits.contiguous(), dim=-1)
-    #     raw_caption_fdec = [self.tokenizer.decode(f_dec_tokens[i].detach().cpu(), decode_raw_tokens=True, skip_special_tokens=True)
-    #                             for i in range(len(f_dec_tokens))]
-
-    #     pos_ada_output = None
-    #     if self.text_decoder.pos_adapter_on:
-    #         pred_ent_hs_all = []
-    #         sequence_output = forward_decoder_output.hidden_states
-
-    #         for bid, box_gts in enumerate(box_targets):
-    #             pred_ent_hs = []
-    #             for bgt in box_gts:
-    #                 tkn_pos = bgt['tkn_pos']
-    #                     # xywh
-    #                 pred_ent_hs.append(
-    #                         sequence_output[bid, tkn_pos-1] + sequence_output[bid, tkn_pos-2])  # obj token + categories token
-                
-    #             if len(pred_ent_hs) > 0:
-    #                 pred_ent_hs = torch.stack(pred_ent_hs)
-    #             else:
-    #                 pred_ent_hs = torch.empty((0, self.config.hidden_size), device=self.device)
-
-    #             pred_ent_hs_all.append(pred_ent_hs)
-
-    #         pos_ada_output = self.text_decoder.pos_adapter(
-    #                 pred_ent_hs_all, samples['image'], image_embeds, encoder_attention_mask, box_targets)
-
-    #     for bi, b_pred_inst in enumerate(batch_object_list_cate_trans):
-    #         for each_inst in b_pred_inst:
-    #             each_inst['obj'].pop('dec_hs')
-    #             each_inst['sub'].pop('dec_hs')
-    #             each_inst['predicate'].pop('dec_hs')
-    #             each_inst['obj'].pop('int_tok_hs')
-    #             each_inst['sub'].pop('int_tok_hs')
-
-    #             each_inst['predicate'].pop('pred_dist')
-    #             each_inst['obj'].pop('pred_dist')
-    #             each_inst['sub'].pop('pred_dist')
-
-    #     image_ids = samples['instance_id'][0]
-    #     forward_buffer = {
-    #             # 'cross_attentions': decoder_out['cross_attentions'],
-    #             # 'decoder_attentions': decoder_out['decoder_attentions'],
-    #             'scores': decoder_out['scores'],  # num_toke, bz, vocab_size
-    #             # 'normed_image': samples['image'],
-    #             'raw_token': decoder_out.sequences.detach().cpu(),
-    #             # "forward_decoder_output": forward_decoder_output,
-    #             "f_dec_tokens": f_dec_tokens,
-    #             "f_dec_pos_ada_output": pos_ada_output,
-    #             'raw_caption_fdec': raw_caption_fdec,
-    #             'raw_caption': raw_caption,
-    #             "raw_caption_target": raw_caption_target,
-    #             "decoder_targets": decoder_targets,
-    #             # "batch_target_object_list": batch_target_object_list,
-    #             "predictions": predictions,
-    #             "ground_truths": ground_truths,
-    #             'image_path': samples['image_pth'],
-    #             "batch_object_list": batch_object_list_cate_trans,
-    #             "gt_instance": samples['targets']
-    #             # 'image_pixel': data_loader.dataset.__getitem__(img_idx, raw_image=True),
-    #             # 'image_size': (image_size, patch_size)
-    #         }
-
-    #     if not os.path.exists(self.dump_dir):
-    #         os.makedirs(self.dump_dir)
-    #     logger.info(f"save data {image_ids} to {self.dump_dir}")
-
-    #     with open(os.path.join(self.dump_dir, f'vl_det_dump_{image_ids}.pkl'), 'wb') as f:
-    #         pickle.dump(forward_buffer, f)
-
-    #     #comentar isso depois
-    #     if image_ids > 48:
-    #         exit()
+        if image_ids > 48:
+            exit()
 
     def seq2instance(self, decoder_out, raw_caption, prompt_length=None, verbose=False):
         """_summary_
@@ -2184,12 +2044,8 @@ class XBertLMHeadDecoderDetHead(XBertLMHeadDecoder):
                             # xywh
                             pred_ent_hs.append(
                                 sequence_output[bid, tkn_pos-1] + sequence_output[bid, tkn_pos-2])  # obj token + categories token
-
-                        if len(pred_ent_hs) > 0:
-                            pred_ent_hs = torch.stack(pred_ent_hs)
-                        else:
-                            pred_ent_hs = torch.empty((0, self.config.hidden_size), device=self.device)
-
+                            
+                        pred_ent_hs = torch.stack(pred_ent_hs)
                         pred_ent_hs_all.append(pred_ent_hs)     
                         pred_ent_label_all.append(torch.Tensor(pred_ent_label).to(pred_ent_hs.device).long()) 
 
@@ -2202,10 +2058,7 @@ class XBertLMHeadDecoderDetHead(XBertLMHeadDecoder):
                                 pred_rel_hs.append(
                                     sequence_output[bid, rel_tkn_pos-1] + sequence_output[bid, rel_tkn_pos-2])
 
-                            if len(pred_rel_hs) > 0:
-                                pred_rel_hs = torch.stack(pred_rel_hs)
-                            else:
-                                pred_rel_hs = torch.empty((0, self.config.hidden_size), device=self.device)
+                            pred_rel_hs = torch.stack(pred_rel_hs)
                             pred_rel_hs_all.append(pred_rel_hs)   
                             pred_rel_label_all.append(torch.Tensor(pred_rel_label).to(pred_rel_hs.device).long()) 
 

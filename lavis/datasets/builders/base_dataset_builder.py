@@ -92,27 +92,14 @@ class BaseDatasetBuilder:
         self._download_vis()
 
     def _download_ann(self):
-        """
-        Download annotation files if necessary.
-        All the vision-language datasets should have annotations of unified format.
-
-        storage_path can be:
-          (1) relative/absolute: will be prefixed with env.cache_root to make full path if relative.
-          (2) basename/dirname: will be suffixed with base name of URL if dirname is provided.
-
-        Local annotation paths should be relative.
-        """
         anns = self.config.build_info.annotations
-
         splits = anns.keys()
-
         cache_root = registry.get_path("cache_root")
+        print(f"Cache root: {cache_root}")
 
         for split in splits:
             info = anns[split]
-
             urls, storage_paths = info.get("url", None), info.storage
-
             if isinstance(urls, str):
                 urls = [urls]
             if isinstance(storage_paths, str):
@@ -120,23 +107,32 @@ class BaseDatasetBuilder:
             assert len(urls) == len(storage_paths)
 
             for url_or_filename, storage_path in zip(urls, storage_paths):
-                # if storage_path is relative, make it full by prefixing with cache_root.
+                print(f"Processing split: {split}")
+                print(f"url_or_filename: {url_or_filename}")
+                print(f"storage_path (original): {storage_path}")
+
+                # If storage_path is relative, make it full by prefixing with cache_root
                 if not os.path.isabs(storage_path):
                     storage_path = os.path.join(cache_root, storage_path)
+                    print(f"storage_path (updated): {storage_path}")
 
                 dirname = os.path.dirname(storage_path)
                 if not os.path.exists(dirname):
                     os.makedirs(dirname)
+                    print(f"Created directory: {dirname}")
 
+                # Check if url_or_filename is a file
+                print(f"Checking if '{url_or_filename}' exists as a file: {os.path.isfile(url_or_filename)}")
                 if os.path.isfile(url_or_filename):
                     src, dst = url_or_filename, storage_path
                     if not os.path.exists(dst):
                         shutil.copyfile(src=src, dst=dst)
+                        print(f"Copied {src} to {dst}")
                     else:
                         logger.info("Using existing file {}.".format(dst))
+                        print(f"File already exists at {dst}")
                 else:
                     if os.path.isdir(storage_path):
-                        # if only dirname is provided, suffix with basename of URL.
                         raise ValueError(
                             "Expecting storage_path to be a file path, got directory {}".format(
                                 storage_path
@@ -144,8 +140,8 @@ class BaseDatasetBuilder:
                         )
                     else:
                         filename = os.path.basename(storage_path)
-
-                    download_url(url=url_or_filename, root=dirname, filename=filename)
+                        print(f"Attempting to download from '{url_or_filename}' to '{dirname}/{filename}'")
+                        download_url(url=url_or_filename, root=dirname, filename=filename)
 
     def _download_vis(self):
 

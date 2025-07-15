@@ -4,7 +4,6 @@
  SPDX-License-Identifier: BSD-3-Clause
  For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/BSD-3-Clause
 """
-
 import argparse
 import random
 import os
@@ -30,6 +29,7 @@ from lavis.processors import *
 from lavis.runners.runner_base import RunnerBase, setup_output_dir
 from lavis.tasks import *
 
+from codecarbon import EmissionsTracker, track_emissions
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Training")
@@ -62,7 +62,6 @@ def setup_seeds(config):
     cudnn.benchmark = False
     cudnn.deterministic = True
 
-
 def main():
     # allow auto-dl completes on main process without timeout when using NCCL backend.
     # os.environ["NCCL_BLOCKING_WAIT"] = "1"
@@ -91,11 +90,15 @@ def main():
     datasets = task.build_datasets(cfg)
     model = task.build_model(cfg)
 
+    tracker = EmissionsTracker()
+    tracker.start()
 
     runner = RunnerBase(
         cfg=cfg, job_id=job_id, task=task, model=model, datasets=datasets,
         result_dir=result_dir, output_dir=output_dir
     )
+
+    _ = tracker.stop()
 
     if get_rank() == 0:
         fetch_git_status(logger)

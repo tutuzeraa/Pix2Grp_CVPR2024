@@ -1,0 +1,37 @@
+# Copyright (c) 2022, salesforce.com, inc.
+# All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+
+datasets:
+  # must match the builder’s registry key
+  places365_rel_detection_eval:
+    dataset_card: dataset_card/places365.md      # (optional) write one later
+    data_type: images                            # we load raw images
+
+    build_info:
+      # ------------------------------------------------------------------
+      # IMAGES
+      # ------------------------------------------------------------------
+      images:
+        # Root folder that holds the full Places365 directory tree,
+        # e.g.  places365/images/a/airport_inside_00000001.jpg
+        storage: places365/images                # ← adjust if moved
+
+      image_lists: 
+        storage: /home/artur.barros/Pix2Grp/Pix2Grp_CVPR2024/cache/places365/places8.csv 
+
+      # ------------------------------------------------------------------
+      # OPTIONAL LIST OF IMAGE PATHS
+      # If provided, only images listed here (relative to *images.storage*)
+      # will be fed to Pix2Grp.  Omit this block to process every image.
+      # ------------------------------------------------------------------
+      # image_lists:
+      #   storage: places365/test_split.txt
+
+      # ------------------------------------------------------------------
+      # VG-150 VOCABULARY
+      # The same file Pix2Grp uses for Visual Genome.  Feeding it here lets
+      # the dataset expose `obj_classes` / `rel_classes` without extra code.
+      # ------------------------------------------------------------------
+      categories:
+        storage: vg/vg_motif_anno/categories_dict.json

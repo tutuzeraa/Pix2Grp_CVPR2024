@@ -19,6 +19,10 @@ from lavis.datasets.datasets.psg_rel_detection import (
     PSGVRDEvalDataset,
 )
 
+from lavis.datasets.datasets.places365_rel_detection import (
+    Places365EvalDataset,
+)
+
 
 @registry.register_builder("oiv6_rel_detection")
 class VrdOIV6DetBuilder(BaseDatasetBuilder):
@@ -93,7 +97,7 @@ class VrdTrainVGDetBuilder(BaseDatasetBuilder):
         "default": "configs/datasets/vg/defaults_rel_det_train.yaml",
     }
 
-
+#AQUI
 @registry.register_builder("vg_rel_detection_eval")
 class VrdEvalVGDetBuilder(BaseDatasetBuilder):
     train_dataset_cls = VGVRDDataset 
@@ -113,12 +117,20 @@ class VrdVGDetBuilder(BaseDatasetBuilder):
     }
 
 
-
 @registry.register_builder("vg_rel_detection_zs_pred")
 class VrdZSPredVGDetBuilder(BaseDatasetBuilder):
     train_dataset_cls = VGVRDDataset 
     eval_dataset_cls = VGVRDEvalDataset
     DATASET_CONFIG_DICT = {
         "default": "configs/datasets/vg/defaults_rel_det_train_zs_pred.yaml",
+    }
+
+
+@registry.register_builder("places365_rel_detection_eval")
+class VrdZSPredPlaces365DetBuilder(BaseDatasetBuilder):
+    train_dataset_cls = Places365EvalDataset
+    eval_dataset_cls = Places365EvalDataset
+    DATASET_CONFIG_DICT = {
+        "default": "configs/datasets/places365/defaults.yaml", 
     }
 

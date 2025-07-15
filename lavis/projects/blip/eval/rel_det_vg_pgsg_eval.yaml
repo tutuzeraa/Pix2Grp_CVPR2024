@@ -16,18 +16,17 @@ model:
 
   sgcls_on: False
   predcls_on: False
+  close_clser: False
 
   top_k_ent_label_num: 1
   top_k_predicate_label_num: 3
 
-  finetuned: "/public/home/lirj2/projects/pix2sgg/lavis/output/BLIP/rel_detection_vg/20231017201-vg_continue-train/checkpoint_15.pth"
-
-  close_clser: False
+  finetuned: "/home/artur.barros/Pix2Grp/weights/vg_sgg.pth"
 
   num_coord_bin: 640
   image_size: 384
   # image_size: 640
-  cate_dict_url: "/public/home/lirj2/projects/pix2sgg/cache/vg/vg_motif_anno/categories_dict.json"
+  cate_dict_url: "/home/artur.barros/Pix2Grp/Pix2Grp_CVPR2024/cache/vg/vg_motif_anno/categories_dict.json"
 
   post_proc_cfg:
     ent_ampl_scale: 5.0
@@ -52,7 +51,7 @@ run:
   task: relation_detection
   # optimizer
   batch_size_train: 64
-  batch_size_eval: 44
+  batch_size_eval: 8
   num_workers: 4
 
   max_len: 1024
@@ -63,7 +62,7 @@ run:
   generation_mode: sampling # sampling search
 
   seed: 42
-  output_dir: "output/BLIP/rel_detection_vg"
+  output_dir: "output/BLIP/results_ARTUR"
 
   evaluate: True
   # test_splits: ["val"]
@@ -76,9 +75,9 @@ run:
   distributed: True
 
   zeroshot_cfg:
-    zs_triplets: '/public/home/lirj2/projects/pix2sgg/cache/vg/vg_motif_anno/zeroshot_triplet_lavis.pytorch'
+    zs_triplets: '/home/artur.barros/Pix2Grp/Pix2Grp_CVPR2024/cache/vg/vg_motif_anno/zeroshot_triplet.pytorch'
     # zs_predicate: [ 1,  8, 14, 13,  6,  9,  7,  2,  3, 12,  0, 10, 11,  4,  5]
     # zs_predicate: [0, 3, 5, 9, 11, 12, 14, 16,  20, 23, 27, 31, 35, 36, 42,]
     zs_predicate: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 23, 25, 26, 27, 31, 34, 35, 36, 40, 41, 42, 44, 48]
 
-  cate_dict_url: "/public/home/lirj2/projects/pix2sgg/cache/vg/vg_motif_anno/categories_dict.json"
+  cate_dict_url: "/home/artur.barros/Pix2Grp/Pix2Grp_CVPR2024/cache/vg/vg_motif_anno/categories_dict.json"

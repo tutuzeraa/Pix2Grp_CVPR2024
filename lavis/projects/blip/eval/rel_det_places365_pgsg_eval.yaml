@@ -10,7 +10,7 @@ model:
   max_txt_len: 512 # test time
   # max_objects: 50
   dump_pred: False
-  dump_dir: "lavis/output/BLIP/rel_detection_vg/vis_dump_val"
+  dump_dir: "/hadatasets/artur.barros/preds_places8"
 
   seg_len: 32
 
@@ -19,11 +19,9 @@ model:
   close_clser: False
 
   top_k_ent_label_num: 1
-  top_k_predicate_label_num: 5
+  top_k_predicate_label_num: 3
 
-  # finetuned: "lavis/output/BLIP/rel_detection_vg/20231021115-vg_zs_pred-train/checkpoint_35.pth"
-  finetuned: "/home/artur.barros/Pix2Grp/weights/vg_ov_sgg.pth"
-  # skip_category_conversion: true   
+  finetuned: "/home/artur.barros/Pix2Grp/weights/vg_sgg.pth"
 
   num_coord_bin: 640
   image_size: 384
@@ -34,24 +32,30 @@ model:
     ent_ampl_scale: 5.0
     rel_ampl_scale: 2.0
 
-
 datasets:
-  vg_rel_detection_eval: # name of the dataset builder
+  places365_rel_detection_eval:          # ← the builder you registered
+    yaml_config: defaults                
+    build_info:
+      annotations:
+        test:
+          url: []
+          storage: []
+      images:
+        storage: "/home/artur.barros/Pix2Grp/Pix2Grp_CVPR2024/cache/places365/images"
+      image_lists:
+        storage: "/home/artur.barros/Pix2Grp/Pix2Grp_CVPR2024/cache/places365/places8.csv"
+      # VG-150 vocabulary so Pix2Grp’s post-proc keeps working
+      categories:
+        storage: "/home/artur.barros/Pix2Grp/Pix2Grp_CVPR2024/cache/vg/vg_motif_anno/categories_dict.json"
+
+    # ─────── processors (unchanged from your original snippet) ───────
     vis_processor:
-        eval:
-          name: "blip_det_image_eval"
-          image_size: 384
-        train:
-          name: "blip_det_image_eval"
-          image_size: 384
+      eval:
+        name: blip_det_image_eval
+        image_size: 384
     text_processor:
-        eval:
-          name: "blip_caption"
-    # build_info:
-    #   annotations:
-    #     val:
-    #       url: "/home/artur.barros/Pix2Grp/Pix2Grp_CVPR2024/cache/vg/vg_motif_anno/VG-SGG-val.h5"
-    #       storage: "vg/vg_motif_anno/VG-SGG-val.h5"  # Optional, can remain as is
+      eval:
+        name: blip_caption
 
 run:
   # task: retrieval
@@ -61,7 +65,7 @@ run:
   batch_size_eval: 8
   num_workers: 4
 
-  max_len: 768
+  max_len: 1024
   min_len: 768
   num_beams: 1
 
@@ -72,7 +76,9 @@ run:
   output_dir: "output/BLIP/results_ARTUR"
 
   evaluate: True
+  # test_splits: ["val"]
   test_splits: ["test"]
+  # test_splits: ["train"]
 
   device: "cuda"
   world_size: 1
@@ -81,6 +87,8 @@ run:
 
   zeroshot_cfg:
     zs_triplets: '/home/artur.barros/Pix2Grp/Pix2Grp_CVPR2024/cache/vg/vg_motif_anno/zeroshot_triplet.pytorch'
+    # zs_predicate: [ 1,  8, 14, 13,  6,  9,  7,  2,  3, 12,  0, 10, 11,  4,  5]
+    # zs_predicate: [0, 3, 5, 9, 11, 12, 14, 16,  20, 23, 27, 31, 35, 36, 42,]
     zs_predicate: [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 23, 25, 26, 27, 31, 34, 35, 36, 40, 41, 42, 44, 48]
 
   cate_dict_url: "/home/artur.barros/Pix2Grp/Pix2Grp_CVPR2024/cache/vg/vg_motif_anno/categories_dict.json"

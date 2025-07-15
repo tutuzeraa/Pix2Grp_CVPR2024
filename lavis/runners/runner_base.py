@@ -11,6 +11,7 @@ import logging
 import os
 import time
 from pathlib import Path
+import pdb
 
 import torch
 import torch.distributed as dist
@@ -481,6 +482,7 @@ class RunnerBase:
         logger.info("Training time {}".format(total_time_str))
 
     def evaluate(self, cur_epoch="best", skip_reload=False):
+        # pdb.set_trace()
         test_logs = dict()
 
         if len(self.test_splits) > 0:
@@ -522,6 +524,7 @@ class RunnerBase:
                 During training, we will reload the best checkpoint for validation.
                 During testing, we will use provided weights and skip reloading the best checkpoint .
         """
+        # pdb.set_trace()
         data_loader = self.dataloaders.get(split_name, None)
         assert data_loader, "data_loader for split {} is None.".format(split_name)
 
