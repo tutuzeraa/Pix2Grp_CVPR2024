@@ -22,14 +22,14 @@ Rodando do jeito mais simples possível minhas gambiarras
 ```bash
 conda create -n pix2sgg python=3.8 pytorch==2.0.0 torchvision==0.15.0 pytorch-cuda=11.8 -c pytorch -c nvidia
 conda activate pix2sgg
-pip install -r requirements_pix2sgg.txt
+pip install -r requirements_pix2sgg.txt # se for promptado, selecione b (backup)
 python setup.py build develop           # pode ser desnecessário
 ```
 
 Depois, é necessário baixar os pesos rodando o seguinte script:
 
 ```bash
-python3 download_weights.py
+python3 download_weights.py   # as vezes falha, tentar mais de uma vez se necessário kkkkk
 ```
 
 ### Dataset
