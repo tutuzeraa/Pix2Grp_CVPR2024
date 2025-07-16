@@ -23,7 +23,7 @@ import lavis.tasks.evaluation.comm as comm
 # --------------------------------------------------------------------------- #
 # constants
 # --------------------------------------------------------------------------- #
-_DUMP_ROOT   = Path("/hadatasets/artur.barros/preds_places8/agora_sim")
+_DUMP_ROOT   = Path("generated_graphs/")
 _FLUSH_EVERY = 200          # graphs per file   ← increase freely
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ class RelationDetectionTask(DetectionTask):
 
         # per-rank buffers
         self._cached_graphs: list[dict] = []
-        self._part_idx: int            = 406
+        self._part_idx: int            = 0
 
     # ------------------------------------------------------------------ #
     # helper – flush

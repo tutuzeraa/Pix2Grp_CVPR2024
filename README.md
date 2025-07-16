@@ -4,6 +4,7 @@
 
     
 ## Table of Contents
+  - [Instructions Artur](#instructions)
   - [Introduction](#introduction)
   - [Installation](#installation)
   - [Dataset](#dataset)
@@ -11,6 +12,45 @@
   - [Training](#train)
   - [Evaluation](#eval)
   - [Reference](#ref)
+
+## Instructions
+
+Rodando do jeito mais simples possível minhas gambiarras
+
+### Criando o environment e baixando dependências
+
+```bash
+conda create -n pix2sgg python=3.8 pytorch==2.0.0 torchvision==0.15.0 pytorch-cuda=11.8 -c pytorch -c nvidia
+conda activate pix2sgg
+pip install -r requirements_pix2sgg.txt
+python setup.py build develop           # pode ser desnecessário
+```
+
+Depois, é necessário baixar os pesos rodando o seguinte script:
+
+```bash
+python3 download_weights.py
+```
+
+### Dataset
+
+É necessário fazer um link simbólico do dataset para a pasta cache. Apenas o diretório com as imagens. O nome do diretório no link deve ser "rcpd".
+
+```bash
+# na raiz do diretório
+ln -s /path-to/dataset cache/rcpd
+```
+
+### Rodar
+
+Para rodar basta executar o seguinte comando:
+
+```bash
+python -m torch.distributed.run --master_port 13958 --nproc_per_node=1 evaluate.py --cfg-path lavis/projects/blip/eval/rel_det_places365_pgsg_eval.yaml --job-name rcpd_graphs
+```
+É possível usar mais GPUs aumentando o nproc_per_node.
+
+Os grafos resultantes vão aparecer na pasta __generated_graphs__.
 
 ## Introduction
 

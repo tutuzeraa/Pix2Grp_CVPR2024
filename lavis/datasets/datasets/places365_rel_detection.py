@@ -84,8 +84,8 @@ class Places365EvalDataset(Dataset):
                 raise ValueError("Either dataset_cfg or vis_root must be provided.")
             dataset_cfg = {
                 "build_info": {
-                    "images": {"storage": "/hadatasets"},
-                    "image_lists" :  {"storage":  "/home/artur.barros/Pix2Grp/Pix2Grp_CVPR2024/cache/places365/places8_2.csv"}
+                    "images": {"storage": "cache/rcpd"},
+                    # "image_lists" :  {"storage":  "/home/artur.barros/Pix2Grp/Pix2Grp_CVPR2024/cache/places365/places8_2.csv"}
                 }
             }
         self.config = dataset_cfg  # keep a reference
