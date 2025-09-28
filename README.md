@@ -4,7 +4,7 @@
 
     
 ## Table of Contents
-  - [Instructions Artur](#instructions)
+  - [Instructions ASGRA](#instructions)
   - [Introduction](#introduction)
   - [Installation](#installation)
   - [Dataset](#dataset)
@@ -15,18 +15,20 @@
 
 ## Instructions
 
-Rodando do jeito mais simples possível minhas gambiarras
+How to generate Scene Graphs for ASGRA.
 
-### Criando o environment e baixando dependências
+### Setting up the environment
+
+First, you must create the environment:
 
 ```bash
 conda create -n pix2sgg python=3.8 pytorch==2.0.0 torchvision==0.15.0 pytorch-cuda=11.8 -c pytorch -c nvidia
 conda activate pix2sgg
 pip install -r requirements_pix2sgg.txt
-python setup.py build develop           # pode ser desnecessário
+python setup.py build develop           
 ```
 
-Depois, é necessário baixar os pesos rodando o seguinte script:
+Following that, you can use this script to download the weights:
 
 ```bash
 python3 download_weights.py
@@ -34,23 +36,22 @@ python3 download_weights.py
 
 ### Dataset
 
-É necessário fazer um link simbólico do dataset para a pasta cache. Apenas o diretório com as imagens. O nome do diretório no link deve ser "rcpd".
+It is necessary to do a symbolic link between the dataset and the cache folder, only the folder with the images. The name of the folder must be "data"
 
 ```bash
-# na raiz do diretório
-ln -s /path-to/dataset cache/rcpd
+ln -s /path-to/dataset cache/data
 ```
 
-### Rodar
+### Running 
 
-Para rodar basta executar o seguinte comando:
+To execute the code, run the following command:
 
 ```bash
-python -m torch.distributed.run --master_port 13958 --nproc_per_node=1 evaluate.py --cfg-path lavis/projects/blip/eval/rel_det_places365_pgsg_eval.yaml --job-name rcpd_graphs
+python -m torch.distributed.run --master_port 13958 --nproc_per_node=1 evaluate.py --cfg-path lavis/projects/blip/eval/rel_det_places365_pgsg_eval.yaml --job-name generate_graphs
 ```
-É possível usar mais GPUs aumentando o nproc_per_node.
+You can use more GPUs setting the nproc_per_node.
 
-Os grafos resultantes vão aparecer na pasta __generated_graphs__.
+The resulting graphs will be at the folder __generated_graphs__.
 
 ## Introduction
 
