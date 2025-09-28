@@ -31,7 +31,7 @@ python setup.py build develop
 Following that, you can use this script to download the weights:
 
 ```bash
-python3 download_weights.py   # as vezes falha, tentar mais de uma vez se necessário kkkkk
+python3 download_weights.py  # you may need to try again 
 ```
 
 ### Dataset
